@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rifas KARREL</title>
+  <!-- Usamos Bootstrap para un estilo moderno -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    /* Estilos personalizados inspirados en rftepic.com */
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f8f9fa;
+    }
+    header {
+      background: url('https://via.placeholder.com/1920x600') no-repeat center center;
+      background-size: cover;
+      height: 300px;
+      color: white;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    header h1 {
+      font-size: 3rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+    }
+    nav {
+      background-color: #343a40;
+    }
+    nav .nav-link {
+      color: #ffffff !important;
+    }
+    .panel {
+      margin-top: 20px;
+      display: none;
+    }
+    .active-panel {
+      display: block;
+    }
+    /* Grilla de números */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 5px;
+    }
+    .grid div {
+      background-color: #28a745;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      cursor: pointer;
+    }
+    .grid div.reservado {
+      background-color: #dc3545;
+      cursor: not-allowed;
+    }
+    .pagination-controls {
+      margin-top: 15px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <h1>Rifas RTepic</h1>
+  </header>
+
+  <!-- Navegación -->
+  <nav class="navbar navbar-expand-md">
+    <div class="container">
+      <a class="navbar-brand text-white" href="#">RTepic Rifas</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExample04">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarsExample04">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item"><a class="nav-link" href="#" onclick="showPanel('rifaPanel')">Inicio</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" onclick="showPanel('adminPanel')">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" onclick="showPanel('paymentPanel')">Pagos</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenedor principal -->
+  <div class="container">
+    <!-- Panel de Rifas -->
+    <div id="rifaPanel" class="panel active-panel">
+      <h2 class="mt-4">Panel de Rifas</h2>
+      <div class="form-group">
+        <label for="eventSelect">Selecciona un evento:</label>
+        <select id="eventSelect" class="form-control"></select>
+      </div>
+      <div id="grid" class="grid"></div>
+      <div id="pagination" class="pagination-controls"></div>
+    </div>
+
+    <!-- Panel de Administración -->
+    <div id="adminPanel" class="panel">
+      <h2 class="mt-4">Panel de Administración</h2>
+      <div class="form-inline">
+        <input id="eventName" type="text" class="form-control mr-2" placeholder="Nombre del evento">
+        <button class="btn btn-primary" onclick="addEvent()">Agregar Evento</button>
+      </div>
+      <ul id="eventList" class="list-group mt-3"></ul>
+    </div>
+
+    <!-- Panel de Pagos -->
+    <div id="paymentPanel" class="panel">
+      <h2 class="mt-4">Panel de Pagos</h2>
+      <div class="form-group">
+        <label for="paymentEventSelect">Selecciona un evento:</label>
+        <select id="paymentEventSelect" class="form-control"></select>
+      </div>
+      <div id="paymentList" class="mt-3"></div>
+      <p class="text-muted mt-2">Nota: Para integrar pagos reales y seguridad se requiere un backend (por ejemplo, Node.js, PHP o Firebase).</p>
+    </div>
+  </div>
+
+  <!-- Scripts de Bootstrap y funcionalidades -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ===============================================
+    //              VARIABLES GLOBALES
+    // ===============================================
+    let events = []; // Se almacena en localStorage con la clave "events"
+    const MAX_NUMBERS = 60000; // Número total (en producción)
+    const pageSize = 100;      // Números por página (para paginación)
+    let currentPage = 1;
+
+    // ===============================================
+    //       CARGA Y GUARDADO DE EVENTOS (ADMIN)
+    // ===============================================
+    function loadEvents() {
+      events = JSON.parse(localStorage.getItem('events')) || [];
+    }
+    function saveEvents() {
+      localStorage.setItem('events', JSON.stringify(events));
+    }
+
+    // ===============================================
+    //           MOSTRAR/OCULTAR PANELES
+    // ===============================================
+    function hideAllPanels() {
+      document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active-panel'));
+    }
+    function showPanel(panelId) {
+      hideAllPanels();
+      document.getElementById(panelId).classList.add('active-panel');
+      if(panelId === 'rifaPanel') {
+        renderEventSelect();
+        currentPage = 1;
+        renderGrid();
+      } else if(panelId === 'adminPanel') {
+        renderEventList();
+      } else if(panelId === 'paymentPanel') {
+        renderPaymentEventSelect();
+        renderPaymentList();
+      }
+    }
+
+    // ===============================================
+    //         PANEL DE ADMINISTRACIÓN
+    // ===============================================
+    function addEvent() {
+      const name = document.getElementById('eventName').value.trim();
+      if(!name) return;
+      const newEvent = { id: Date.now().toString(), name: name };
+      events.push(newEvent);
+      saveEvents();
+      document.getElementById('eventName').value = '';
+      renderEventList();
+    }
+    function deleteEvent(id) {
+      events = events.filter(evt => evt.id !== id);
+      saveEvents();
+      renderEventList();
+    }
+    function renderEventList() {
+      const list = document.getElementById('eventList');
+      list.innerHTML = '';
+      if(events.length === 0) {
+        list.innerHTML = '<li class="list-group-item">No hay eventos</li>';
+        return;
+      }
+      events.forEach(evt => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.textContent = evt.name;
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-danger btn-sm';
+        btn.textContent = 'Eliminar';
+        btn.onclick = () => deleteEvent(evt.id);
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+    }
+
+    // ===============================================
+    //         PANEL DE RIFAS (NÚMEROS)
+    // ===============================================
+    function renderEventSelect() {
+      const select = document.getElementById('eventSelect');
+      select.innerHTML = '';
+      if(events.length === 0) {
+        const option = document.createElement('option');
+        option.textContent = 'No hay eventos disponibles';
+        option.value = '';
+        select.appendChild(option);
+        return;
+      }
+      events.forEach(evt => {
+        const option = document.createElement('option');
+        option.value = evt.id;
+        option.textContent = evt.name;
+        select.appendChild(option);
+      });
+    }
+    function getReservationsForEvent(eventId) {
+      return JSON.parse(localStorage.getItem('reservas_' + eventId)) || [];
+    }
+    function renderGrid() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      const select = document.getElementById('eventSelect');
+      const selectedEventId = select.value;
+      if(!selectedEventId) {
+        grid.innerHTML = '<p>Selecciona un evento para ver los números.</p>';
+        return;
+      }
+      let reservas = getReservationsForEvent(selectedEventId);
+      const now = Date.now();
+      reservas = reservas.filter(r => now - r.timestamp < 48 * 60 * 60 * 1000);
+      localStorage.setItem('reservas_' + selectedEventId, JSON.stringify(reservas));
+      
+      const totalPages = Math.ceil(MAX_NUMBERS / pageSize);
+      if(currentPage > totalPages) currentPage = totalPages;
+      if(currentPage < 1) currentPage = 1;
+      const start = (currentPage - 1) * pageSize + 1;
+      const end = Math.min(currentPage * pageSize, MAX_NUMBERS);
+      
+      for(let i = start; i <= end; i++) {
+        const cell = document.createElement('div');
+        cell.textContent = i;
+        const isReserved = reservas.some(r => r.numero === i);
+        if(isReserved) {
+          cell.classList.add('reservado');
+        }
+        cell.addEventListener('click', () => {
+          if(isReserved) return;
+          reservas.push({ numero: i, timestamp: Date.now(), pagado: false });
+          localStorage.setItem('reservas_' + selectedEventId, JSON.stringify(reservas));
+          renderGrid();
+        });
+        grid.appendChild(cell);
+      }
+      
+      // Controles de paginación
+      const pagination = document.getElementById('pagination');
+      pagination.innerHTML = '';
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'btn btn-secondary btn-sm';
+      prevBtn.textContent = 'Anterior';
+      prevBtn.disabled = currentPage <= 1;
+      prevBtn.onclick = () => { currentPage--; renderGrid(); };
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'btn btn-secondary btn-sm ml-2';
+      nextBtn.textContent = 'Siguiente';
+      nextBtn.disabled = currentPage >= totalPages;
+      nextBtn.onclick = () => { currentPage++; renderGrid(); };
+      const info = document.createElement('span');
+      info.textContent = ` Página ${currentPage} de ${totalPages} `;
+      pagination.appendChild(prevBtn);
+      pagination.appendChild(info);
+      pagination.appendChild(nextBtn);
+    }
+    document.getElementById('eventSelect').addEventListener('change', () => {
+      currentPage = 1;
+      renderGrid();
+    });
+
+    // ===============================================
+    //         PANEL DE PAGOS
+    // ===============================================
+    function renderPaymentEventSelect() {
+      const select = document.getElementById('paymentEventSelect');
+      select.innerHTML = '';
+      if(events.length === 0) {
+        const option = document.createElement('option');
+        option.textContent = 'No hay eventos';
+        option.value = '';
+        select.appendChild(option);
+        return;
+      }
+      events.forEach(evt => {
+        const option = document.createElement('option');
+        option.value = evt.id;
+        option.textContent = evt.name;
+        select.appendChild(option);
+      });
+    }
+    function renderPaymentList() {
+      const eventId = document.getElementById('paymentEventSelect').value;
+      const list = document.getElementById('paymentList');
+      list.innerHTML = '';
+      if(!eventId) {
+        list.textContent = 'Seleccione un evento';
+        return;
+      }
+      let reservas = JSON.parse(localStorage.getItem('reservas_' + eventId)) || [];
+      const now = Date.now();
+      reservas = reservas.filter(r => !r.pagado && (now - r.timestamp < 48 * 60 * 60 * 1000));
+      if(reservas.length === 0) {
+        list.textContent = 'No hay reservas pendientes de pago.';
+        return;
+      }
+      reservas.forEach(res => {
+        const div = document.createElement('div');
+        div.className = 'mb-2';
+        div.textContent = 'Número: ' + res.numero + ' ';
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-success btn-sm';
+        btn.textContent = 'Confirmar pago';
+        btn.onclick = () => {
+          res.pagado = true;
+          let updated = JSON.parse(localStorage.getItem('reservas_' + eventId)) || [];
+          updated = updated.map(r => {
+            if(r.numero === res.numero && r.timestamp === res.timestamp) {
+              r.pagado = true;
+            }
+            return r;
+          });
+          localStorage.setItem('reservas_' + eventId, JSON.stringify(updated));
+          renderPaymentList();
+        };
+        div.appendChild(btn);
+        list.appendChild(div);
+      });
+    }
+    document.getElementById('paymentEventSelect').addEventListener('change', renderPaymentList);
+
+    // ===============================================
+    //             INICIALIZACIÓN
+    // ===============================================
+    loadEvents();
+    showPanel('rifaPanel');
+  </script>
+</body>
+</html>
